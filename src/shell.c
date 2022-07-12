@@ -7,9 +7,83 @@
 /* Imports from different libraries */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 /* Declaration of constants for the programme */
 #define SHELL_LINE_BUFFSIZE 1024
+#define SHELL_TOK_BUFFSIZE 64
+#define SHELL_TOK_CHAR " \t\r\n\a"
+
+
+int shell_launch( char **args )
+{
+    pid_t pid, wpid;
+    int status;
+
+    pid = fork();
+    if( pid == 0 )
+    {
+        /* Child Process */
+        if( execvp( args[0], args ) == -1 )
+        {
+            perror( "shell" );
+        }
+        exit( EXIT_FAILURE );
+    } else if( pid < 0 ){
+        /* Error Forking */
+        perror( "shell" );
+    } else{
+        /* Parent Process */
+        do
+        {
+            wpid = waitpid( pid, &status, WUNTRACED );
+        } while( !WIFEXITED( status ) && !WIFSIGNALED( status ) );
+    }
+
+    return 1;
+}
+
+
+char **shell_split_line( char *line )
+{
+    int buffsize = SHELL_TOK_BUFFSIZE;
+    int position = 0;
+    char **tokens = malloc( buffsize * sizeof( char* ) );
+    char *token;
+
+
+    if( !tokens )
+    {
+        fprintf( stderr, "shell: allocation error\n" );
+        exit( EXIT_FAILURE );
+    }
+
+    token = strtok( line, SHELL_TOK_CHAR );
+    while( token != NULL )
+    {
+        tokens[position] = token;
+        position++;
+    
+
+        if( position >= buffsize )
+        {
+            buffsize += SHELL_TOK_BUFFSIZE;
+            tokens = realloc( tokens, buffsize * sizeof( char* ) );
+        
+            if( !tokens )
+            {
+                fprintf( stderr, "shell, allocation error\n" );
+                exit(EXIT_FAILURE);
+            }
+        }
+    token = strtok( NULL, SHELL_TOK_CHAR );
+    }
+    tokens[position] = NULL;
+    return tokens;
+}
 
 char *shell_read_line()
 {
